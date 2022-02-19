@@ -1,0 +1,135 @@
+## Query 1: In a tumbling window of 1 minute count the number of Audis that passed through a toll station.
+
+SELECT COUNT([Input].[vehicleTypeID]) as Number_of_Audis
+INTO [output]
+FROM [Input]
+JOIN [inputcar] ON [Input].[vehicleTypeID] = [inputcar].[id]
+WHERE [inputcar].[CAR_MAKE] LIKE '%Audi%' AND [Input].[spotType] = 'Toll_Station'
+GROUP BY TumblingWindow(minute,1) 
+
+# -----------------------------------------------------------------------------------
+## Query 2: In a hopping window of 3 minutes, for each color, calculate the total number of cars 
+##          that passed through a police speed limit camera. Repeat every 90 seconds.
+
+SELECT COUNT([input].[vehicleTypeID]) AS Number_of_cars, [inputcolors].[color_name] AS Color
+INTO
+    [output]
+FROM
+    [input]
+JOIN [inputcolors] ON [input].[colorID] = [inputcolors].[color_code]
+WHERE [input].[spotType] = 'Speed_Limit_Camera'
+GROUP BY HoppingWindow(minute, 3, 1.5), [inputcolors].[color_name];
+
+# -----------------------------------------------------------------------------------
+## Query 3: In a tumbling window of 20 seconds, for each color, find the oldest car that passed through a toll station.
+
+WITH query3(color_name,oldest_year) 
+AS
+(
+SELECT [inputcolors].[color_name],MIN([inputcar].[CAR_MODEL_YEAR]) as [oldest_year]
+FROM [Input]
+JOIN [inputcar] ON [Input].[vehicleTypeID] = [inputcar].[id]
+JOIN [inputcolors] ON [Input].[colorID] = [inputcolors].[color_code]
+WHERE [Input].[spotType] = 'Toll_Station'
+GROUP BY TUMBLINGWINDOW(SECOND,20),[inputcolors].[color_name]
+)
+select [query3].[color_name], [query3].[oldest_year], [inputcar].[CAR_MAKE] , [inputcar].[CAR_MODEL]
+INTO [output]
+FROM [query3]
+JOIN [inputcar] ON [inputcar].[CAR_MODEL_YEAR] = [query3].[oldest_year] 
+
+# -----------------------------------------------------------------------------------
+## Query 4: In a sliding window of 60 seconds, calculate the speed limit camera spots where the most violations happened.
+
+WITH query2(spot,number_of_cars)
+AS
+(
+SELECT [inputspeed].[id] AS SPOT, COUNT([Input].[vehicleTypeID]) AS [Number_of_Cars]
+    FROM [Input]
+    JOIN [inputspeed] ON [Input].[checkpointID] = [inputspeed].[id]
+    WHERE CAST([Input].[speed] AS BIGINT) > [inputspeed].[SPEED_LIMIT] AND [Input].[spotType] = 'Speed_Limit_Camera'
+    GROUP BY SlidingWindow(second, 60), [inputspeed].[id]
+)
+select [query2].[spot],[inputspeed].[CITY],[inputspeed].[ADDRESS] ,[query2].[number_of_cars]
+INTO [output]
+FROM [query2]
+JOIN [inputspeed] ON [inputspeed].[id] = [query2].[spot] 
+
+# -----------------------------------------------------------------------------------
+## Query 5: In a sliding window of five minutes, for each color and car model, 
+##          display the total number of cars that break the speed limit.
+
+SELECT [inputcolors].[color_name],[inputcar].[CAR_MODEL], COUNT([inputspeed].[id]) AS Total_Number
+INTO [output]
+FROM [Input]
+JOIN [inputcolors] ON [Input].[colorID] = [inputcolors].[color_code]
+JOIN [inputcar] ON [Input].[vehicleTypeID] = [inputcar].[id]
+JOIN [inputspeed] ON [Input].[checkpointID] = [inputspeed].[id] 
+WHERE CAST([Input].[speed] AS BIGINT) > [inputspeed].[SPEED_LIMIT]
+GROUP BY SlidingWindow(minute,5),[inputcolors].[color_name],[inputcar].[CAR_MODEL]
+
+# -----------------------------------------------------------------------------------
+
+## Query 6: You have been given a list of the license plates of police’s most wanted criminals. 
+##          In a sliding window of 1 minute, display a list of all the cars that you spotted at any checkpoint.
+
+WITH query6(licensePlate, checkpointID) 
+AS
+(
+    SELECT [input].[licensePlate], [input].[checkpointID]
+    FROM [input]
+    JOIN [inputwanted] ON [input].[licensePlate] = [inputwanted].[licensePlate]
+    GROUP BY [input].[licensePlate], [input].[checkpointID], SlidingWindow(minute, 1)
+    HAVING COUNT([input].[checkpointID]) > 0
+)
+select [query6].[licensePlate],[query6].[checkpointID], [inputcar].[CAR_MAKE] , [inputcar].[CAR_MODEL]
+INTO [output]
+FROM [query6]
+JOIN [inputcar] ON [inputcar].[id] = [query6].[checkpointID] 
+
+
+WITH query6(licensePlate, checkpointID) 
+AS
+(
+    SELECT [input].[licensePlate], [input].[checkpointID]
+    FROM [input]
+    JOIN [inputwanted] ON [input].[licensePlate] = [inputwanted].[licensePlate]
+    GROUP BY [input].[licensePlate], [input].[checkpointID], SlidingWindow(minute, 1)
+    HAVING COUNT([input].[checkpointID]) > 0
+)
+select [query6].[licensePlate], [inputcar].[CAR_MAKE] , [inputcar].[CAR_MODEL]
+INTO [output]
+FROM [query6]
+JOIN [inputcar] ON [inputcar].[id] = [query6].[checkpointID] 
+
+# -----------------------------------------------------------------------------------
+
+## Query 7: In a sliding window of 1 minute, display a list of fake license plates. 
+##          Check if the same license plate has passed through any type of checkpoint twice in the same time window.
+
+SELECT [input].[licensePlate] as fake_licenseplates, COUNT([input].[licensePlate]) AS [COUNT]
+INTO [output]
+FROM [Input]
+WHERE [Input].[spotType]='Toll_Station' OR [Input].[spotType]='Speed_limit_Camera' 
+GROUP BY [input].[licensePlate], SlidingWindow(minute,1)
+HAVING [COUNT]> 1 
+
+# -----------------------------------------------------------------------------------
+
+## Query 8: In a tumbling window of 2 minutes, calculate the percentage of BMW drivers that break the speed limit. 
+
+SELECT [x].[number] * 100/ [y].[total_number] AS 'percentage(%)' FROM
+( SELECT COUNT([input].[vehicleTypeID]) AS number
+	FROM [input]
+    JOIN [inputcar] ON [input].[vehicleTypeID] = [inputcar].[id]
+    JOIN [inputspeed] ON [input].[checkpointID] = [inputspeed].[id]
+    WHERE [inputcar].[CAR_MAKE] = 'BMW' AND CAST([input].[speed] AS BIGINT) > [inputspeed].[SPEED_LIMIT]
+    GROUP BY TUMBLINGWINDOW(MINUTE,2)) x
+JOIN 
+( SELECT COUNT([input].[vehicleTypeID]) AS total_number 
+	FROM [input]
+    JOIN [inputcar] ON [input].[vehicleTypeID] = [inputcar].[id]
+    JOIN [inputspeed] ON [input].[checkpointID] = [inputspeed].[id]
+    WHERE [inputcar].[CAR_MAKE] = 'BMW'
+    GROUP BY TUMBLINGWINDOW(MINUTE,2)
+) y ON 1=1 AND DATEDIFF(minute,x,y) BETWEEN 0 AND 2
