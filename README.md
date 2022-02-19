@@ -1,10 +1,10 @@
 # Azure-Stream-Analytics
 
-## SCENARIO
+#### SCENARIO
 
 You have access to a data stream that’s generated from sensors placed in some checkpoints (toll stations and speed cameras). Each time a car passes by one checkpoint, an event is generated. All cars are equipped with tags that provide the vehicleTypeID and colorID of each car. Tag readers are capable of reading this information. In addition, a camera reads the license plate and completed the event’s data. 
 
-## REFERENCE DATA
+#### REFERENCE DATA
 
 CAR_DATA.csv: Information about the make, model and model year of all the cars.
 
