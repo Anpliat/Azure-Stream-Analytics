@@ -6,7 +6,7 @@ You have access to a data stream that’s generated from sensors placed in some 
 
 REFERENCE DATA
 
-CAR_DATA.csv: Information about the Make, Model and Model Year of all the cars.
+CAR_DATA.csv: Information about the make, model and model year of all the cars.
 
 COLORS.json: Information about the color of each car.
 
